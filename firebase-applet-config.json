@@ -1,0 +1,12 @@
+{
+  "projectId": "musiorg-timtable-beta",
+  "appId": "1:832238368835:web:12ab53c534c1f9d1457cf6",
+  "apiKey": "AIzaSyAx4IB1c0Mvp54RReVm2_zBGc32hEue8p0",
+  "authDomain": "musiorg-timtable-beta.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "musiorg-timtable-beta.firebasestorage.app",
+  "messagingSenderId": "832238368835",
+  "measurementId": "",
+  "oAuthClientId": "",
+  "recaptchaSiteKey": ""
+}

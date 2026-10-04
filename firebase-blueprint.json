@@ -1,0 +1,175 @@
+{
+  "entities": {
+    "TeacherProfile": {
+      "title": "TeacherProfile",
+      "description": "User teacher profile and scheduling preferences",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "workingDays": { "type": "array" },
+        "startHour": { "type": "string" },
+        "finishHour": { "type": "string" },
+        "maxConsecutiveLessons": { "type": "number" },
+        "breakDuration": { "type": "number" },
+        "lunchStart": { "type": "string" },
+        "lunchEnd": { "type": "string" },
+        "preferredSchoolOrder": { "type": "array" },
+        "travelTimeMinutes": { "type": "number" },
+        "cycleTerminology": { "type": "string" }
+      },
+      "required": ["id", "email"]
+    },
+    "School": {
+      "title": "School",
+      "description": "School with teaching days, hours, independent cycle, and breaks",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "teachingDays": { "type": "array" },
+        "dayHours": { "type": "object" },
+        "breaks": { "type": "array" },
+        "currentWeekCycle": { "type": "string", "enum": ["A", "B"] },
+        "cycleTerminology": { "type": "string", "enum": ["week_ab", "week_12"] },
+        "cycleNotes": { "type": "string" },
+        "colorTheme": { "type": "string" },
+        "travelNotes": { "type": "string" },
+        "address": { "type": "string" }
+      },
+      "required": ["id", "name", "code", "currentWeekCycle"]
+    },
+    "YearGroup": {
+      "title": "YearGroup",
+      "description": "Year group in a school",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "schoolId": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["id", "schoolId", "name"]
+    },
+    "YearSubgroup": {
+      "title": "YearSubgroup",
+      "description": "Subgroup in a year group",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "schoolId": { "type": "string" },
+        "yearGroupId": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["id", "schoolId", "yearGroupId", "name"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "Student record with timetable rules and preferences",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "schoolId": { "type": "string" },
+        "yearGroupId": { "type": "string" },
+        "subgroupId": { "type": "string" },
+        "name": { "type": "string" },
+        "instrument": { "type": "string" },
+        "lessonDuration": { "type": "number" },
+        "normalTeachingDay": { "type": "string" },
+        "frequency": { "type": "string" },
+        "preferredTime": { "type": "string" },
+        "preferredSpecificTime": { "type": "string" },
+        "allowedWindows": { "type": "array" },
+        "siblingStudentIds": { "type": "array" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "schoolId", "name", "instrument", "lessonDuration"]
+    },
+    "Restriction": {
+      "title": "Restriction",
+      "description": "School, year, subgroup, student, or teacher schedule restriction",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "scope": { "type": "string" },
+        "targetId": { "type": "string" },
+        "schoolId": { "type": "string" },
+        "type": { "type": "string" },
+        "weekPattern": { "type": "string" },
+        "dayOfWeek": { "type": "string" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "reason": { "type": "string" }
+      },
+      "required": ["id", "scope", "targetId", "type", "weekPattern", "dayOfWeek", "startTime", "endTime", "reason"]
+    },
+    "TemporaryException": {
+      "title": "TemporaryException",
+      "description": "One-off absence, trip, exam, or event",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "targetScope": { "type": "string" },
+        "targetId": { "type": "string" },
+        "title": { "type": "string" },
+        "date": { "type": "string" },
+        "weekCycle": { "type": "string" },
+        "day": { "type": "string" },
+        "type": { "type": "string" }
+      },
+      "required": ["id", "targetScope", "targetId", "title", "weekCycle", "day", "type"]
+    },
+    "TimetableSlot": {
+      "title": "TimetableSlot",
+      "description": "Scheduled recurring lesson slot for Week A or B",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "weekCycle": { "type": "string", "enum": ["A", "B"] },
+        "schoolId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "day": { "type": "string" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "duration": { "type": "number" },
+        "isManualOverride": { "type": "boolean" }
+      },
+      "required": ["id", "weekCycle", "schoolId", "studentId", "day", "startTime", "endTime", "duration"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/TeacherProfile" },
+      "description": "Teacher profile document"
+    },
+    "/users/{userId}/schools/{schoolId}": {
+      "schema": { "$ref": "#/entities/School" },
+      "description": "Schools taught by this teacher"
+    },
+    "/users/{userId}/yearGroups/{yearGroupId}": {
+      "schema": { "$ref": "#/entities/YearGroup" },
+      "description": "Year groups for schools"
+    },
+    "/users/{userId}/subgroups/{subgroupId}": {
+      "schema": { "$ref": "#/entities/YearSubgroup" },
+      "description": "Subgroups for year groups"
+    },
+    "/users/{userId}/students/{studentId}": {
+      "schema": { "$ref": "#/entities/Student" },
+      "description": "Music students belonging to this teacher"
+    },
+    "/users/{userId}/restrictions/{restrictionId}": {
+      "schema": { "$ref": "#/entities/Restriction" },
+      "description": "Time restrictions and blocked periods"
+    },
+    "/users/{userId}/temporaryExceptions/{exceptionId}": {
+      "schema": { "$ref": "#/entities/TemporaryException" },
+      "description": "Temporary one-off exceptions"
+    },
+    "/users/{userId}/timetableSlots/{slotId}": {
+      "schema": { "$ref": "#/entities/TimetableSlot" },
+      "description": "Scheduled lessons for Week A and Week B"
+    }
+  }
+}
