@@ -14,14 +14,44 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Teacher user profile and all subordinate private collections:
-    // /schools, /yearGroups, /subgroups, /students, /restrictions,
-    // /temporaryExceptions, /timetableSlots
-    match /users/{userId} {
-      allow read, write: if isOwner(userId);
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == "kostispiano@gmail.com" ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
 
+    // Teacher & Admin User Accounts
+    match /users/{userId} {
+      // Ordinary user can only read their own document.
+      // Admin can read all user documents for subscriber management & statistics.
+      allow read: if isOwner(userId) || isAdmin();
+
+      // Account initial creation:
+      // Allow user to create their initial profile document upon first sign-up.
+      // Non-admins must start as role 'teacher' with non-active subscription.
+      allow create: if (isOwner(userId) && (
+        (request.resource.data.role == 'admin' && request.auth.token.email == "kostispiano@gmail.com") ||
+        (request.resource.data.role == 'teacher' && request.resource.data.subscriptionStatus in ['inactive', 'trial', 'none'])
+      )) || isAdmin();
+
+      // Account updates:
+      // Ordinary users can update their profile information and mailing preferences,
+      // but CANNOT modify their role or subscription status.
+      // Admins have full rights to modify status, plan, and role.
+      allow update: if (isOwner(userId) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'subscriptionStatus', 'subscriptionPlan', 'subscriptionEndDate'])
+      ) || isAdmin();
+
+      // Only administrators can delete user accounts
+      allow delete: if isAdmin();
+
+      // Subordinate private collections:
+      // /schools, /yearGroups, /subgroups, /students, /restrictions,
+      // /temporaryExceptions, /timetableSlots
       match /{allSubcollections=**} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isOwner(userId) || isAdmin();
       }
     }
   }

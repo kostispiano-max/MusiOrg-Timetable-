@@ -217,8 +217,8 @@ export const AddLessonModal: React.FC<AddLessonModalProps> = ({
               <label className="block text-xs font-medium text-neutral-700 mb-1">
                 Duration (min)
               </label>
-              <div className="grid grid-cols-4 gap-1">
-                {[20, 30, 45, 60].map((d) => (
+              <div className="grid grid-cols-3 gap-1.5">
+                {[20, 30, 40, ...(![20, 30, 40].includes(duration) ? [duration] : [])].map((d) => (
                   <button
                     key={d}
                     type="button"
@@ -229,7 +229,7 @@ export const AddLessonModal: React.FC<AddLessonModalProps> = ({
                         : 'bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50'
                     }`}
                   >
-                    {d}
+                    {d}m{![20, 30, 40].includes(d) ? ' (Leg)' : ''}
                   </button>
                 ))}
               </div>

@@ -12,7 +12,10 @@ import {
   CycleTerminology,
   BreakPeriod,
   SchoolColorTheme,
+  DayHours,
+  STANDARD_LESSON_DURATIONS,
 } from '../../types';
+import { normalizeSchoolDayHours } from '../../services/dbService';
 import {
   Plus,
   Trash2,
@@ -86,8 +89,13 @@ export const SchoolsManager: React.FC<SchoolsManagerProps> = ({
   const [editSchoolName, setEditSchoolName] = useState<string>('');
   const [editSchoolCode, setEditSchoolCode] = useState<string>('');
   const [editSchoolDays, setEditSchoolDays] = useState<DayOfWeek[]>([]);
-  const [editSchoolStart, setEditSchoolStart] = useState<string>('09:00');
-  const [editSchoolEnd, setEditSchoolEnd] = useState<string>('15:30');
+  const [editDaySchedule, setEditDaySchedule] = useState<Record<DayOfWeek, DayHours>>({
+    Monday: { startTime: '09:00', endTime: '15:00', standardLessonDuration: 30 },
+    Tuesday: { startTime: '09:00', endTime: '16:00', standardLessonDuration: 30 },
+    Wednesday: { startTime: '10:00', endTime: '14:30', standardLessonDuration: 30 },
+    Thursday: { startTime: '13:30', endTime: '16:30', standardLessonDuration: 30 },
+    Friday: { startTime: '09:00', endTime: '12:30', standardLessonDuration: 30 },
+  });
   const [editSchoolDuration, setEditSchoolDuration] = useState<number>(30);
   const [editSchoolTheme, setEditSchoolTheme] = useState<SchoolColorTheme>('sage');
   const [editSchoolAddress, setEditSchoolAddress] = useState<string>('');
@@ -143,15 +151,15 @@ export const SchoolsManager: React.FC<SchoolsManagerProps> = ({
 
   // Open Full Edit School Modal
   const openEditSchoolModal = (school: School) => {
+    const normalized = normalizeSchoolDayHours(school);
     const firstDay = school.teachingDays[0] || 'Monday';
-    const firstHours = school.dayHours[firstDay] || { startTime: '09:00', endTime: '15:30', standardLessonDuration: 30 };
+    const firstDuration = normalized.dayHours[firstDay]?.standardLessonDuration || 30;
 
     setEditSchoolName(school.name);
     setEditSchoolCode(school.code || '');
     setEditSchoolDays([...school.teachingDays]);
-    setEditSchoolStart(firstHours.startTime);
-    setEditSchoolEnd(firstHours.endTime);
-    setEditSchoolDuration(firstHours.standardLessonDuration);
+    setEditDaySchedule(normalized.dayHours);
+    setEditSchoolDuration(firstDuration);
     setEditSchoolTheme(school.colorTheme || 'sage');
     setEditSchoolAddress(school.address || '');
     setEditSchoolTravelNotes(school.travelNotes || '');
@@ -163,16 +171,18 @@ export const SchoolsManager: React.FC<SchoolsManagerProps> = ({
     e.preventDefault();
     if (!activeSchool || !editSchoolName.trim() || editSchoolDays.length === 0) return;
 
-    const updatedDayHours: Record<DayOfWeek, { startTime: string; endTime: string; standardLessonDuration: number }> = {
-      ...activeSchool.dayHours,
+    const updatedDayHours: Record<DayOfWeek, DayHours> = {
+      ...editDaySchedule,
     };
 
+    // Propagate standard lesson duration to enabled teaching days
     editSchoolDays.forEach((d) => {
-      updatedDayHours[d] = {
-        startTime: editSchoolStart,
-        endTime: editSchoolEnd,
-        standardLessonDuration: editSchoolDuration,
-      };
+      if (updatedDayHours[d]) {
+        updatedDayHours[d] = {
+          ...updatedDayHours[d],
+          standardLessonDuration: editSchoolDuration,
+        };
+      }
     });
 
     const updatedSchools = schools.map((s) => {
@@ -1255,8 +1265,7 @@ export const SchoolsManager: React.FC<SchoolsManagerProps> = ({
                   >
                     <option value={20}>20 minutes</option>
                     <option value={30}>30 minutes</option>
-                    <option value={45}>45 minutes</option>
-                    <option value={60}>60 minutes</option>
+                    <option value={40}>40 minutes</option>
                   </select>
                 </div>
               </div>
@@ -1447,48 +1456,100 @@ export const SchoolsManager: React.FC<SchoolsManagerProps> = ({
                 </div>
               </div>
 
-              {/* Hours and Lesson Duration */}
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-medium text-neutral-700 mb-1">
-                    Start Time
+              {/* Day-Specific Availability Hours */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block font-medium text-neutral-800 text-xs">
+                    Day-Specific Teaching Hours
                   </label>
-                  <input
-                    type="time"
-                    value={editSchoolStart}
-                    step="300"
-                    onChange={(e) => setEditSchoolStart(e.target.value)}
-                    className="w-full border border-neutral-300 rounded-lg px-2.5 py-2 font-mono text-neutral-900"
-                  />
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <span className="text-neutral-500">Standard Lesson:</span>
+                    <select
+                      value={editSchoolDuration}
+                      onChange={(e) => setEditSchoolDuration(parseInt(e.target.value, 10))}
+                      className="border border-neutral-300 rounded px-2 py-1 text-xs bg-white text-neutral-800 font-medium"
+                    >
+                      <option value={20}>20 minutes</option>
+                      <option value={30}>30 minutes</option>
+                      <option value={40}>40 minutes</option>
+                      {![20, 30, 40].includes(editSchoolDuration) && (
+                        <option value={editSchoolDuration}>{editSchoolDuration} minutes (Legacy)</option>
+                      )}
+                    </select>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block font-medium text-neutral-700 mb-1">
-                    Finish Time
-                  </label>
-                  <input
-                    type="time"
-                    value={editSchoolEnd}
-                    step="300"
-                    onChange={(e) => setEditSchoolEnd(e.target.value)}
-                    className="w-full border border-neutral-300 rounded-lg px-2.5 py-2 font-mono text-neutral-900"
-                  />
-                </div>
+                <div className="border border-neutral-200 rounded-xl overflow-hidden bg-white shadow-2xs">
+                  <table className="w-full text-left text-xs divide-y divide-neutral-200">
+                    <thead className="bg-neutral-50 text-[11px] font-semibold text-neutral-600">
+                      <tr>
+                        <th className="px-3 py-2">Day</th>
+                        <th className="px-3 py-2 text-center">Teaching</th>
+                        <th className="px-3 py-2">Start Time</th>
+                        <th className="px-3 py-2">Finish Time</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-100">
+                      {DAYS_OF_WEEK.map((day) => {
+                        const isTeaching = editSchoolDays.includes(day);
+                        const schedule = editDaySchedule[day] || { startTime: '09:00', endTime: '15:30', standardLessonDuration: 30 };
 
-                <div>
-                  <label className="block font-medium text-neutral-700 mb-1">
-                    Lesson Duration
-                  </label>
-                  <select
-                    value={editSchoolDuration}
-                    onChange={(e) => setEditSchoolDuration(parseInt(e.target.value, 10))}
-                    className="w-full border border-neutral-300 rounded-lg px-2.5 py-2 bg-white text-neutral-900"
-                  >
-                    <option value={20}>20 minutes</option>
-                    <option value={30}>30 minutes</option>
-                    <option value={45}>45 minutes</option>
-                    <option value={60}>60 minutes</option>
-                  </select>
+                        return (
+                          <tr key={day} className={isTeaching ? 'bg-white' : 'bg-neutral-50/50 text-neutral-400'}>
+                            <td className="px-3 py-2 font-medium">
+                              <span className={isTeaching ? 'text-neutral-900 font-semibold' : 'text-neutral-400'}>{day}</span>
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              <input
+                                type="checkbox"
+                                checked={isTeaching}
+                                onChange={() => {
+                                  if (isTeaching) {
+                                    setEditSchoolDays(editSchoolDays.filter((d) => d !== day));
+                                  } else {
+                                    setEditSchoolDays([...editSchoolDays, day]);
+                                  }
+                                }}
+                                className="rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900 cursor-pointer"
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="time"
+                                step="300"
+                                disabled={!isTeaching}
+                                value={schedule.startTime}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setEditDaySchedule((prev) => ({
+                                    ...prev,
+                                    [day]: { ...prev[day], startTime: val },
+                                  }));
+                                }}
+                                className="border border-neutral-200 rounded px-2 py-1 font-mono text-xs text-neutral-900 disabled:text-neutral-400 disabled:bg-neutral-100"
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="time"
+                                step="300"
+                                disabled={!isTeaching}
+                                value={schedule.endTime}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setEditDaySchedule((prev) => ({
+                                    ...prev,
+                                    [day]: { ...prev[day], endTime: val },
+                                  }));
+                                }}
+                                className="border border-neutral-200 rounded px-2 py-1 font-mono text-xs text-neutral-900 disabled:text-neutral-400 disabled:bg-neutral-100"
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 

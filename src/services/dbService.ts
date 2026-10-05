@@ -7,6 +7,7 @@ import {
   getDoc,
   writeBatch,
   onSnapshot,
+  updateDoc,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import {
@@ -18,6 +19,13 @@ import {
   TemporaryException,
   TimetableSlot,
   TeacherProfile,
+  UserAccount,
+  UserRole,
+  SubscriptionStatus,
+  SubscriptionPlan,
+  DAYS_OF_WEEK,
+  DayOfWeek,
+  DayHours,
 } from '../types';
 import { AppState } from '../utils/storage';
 import {
@@ -30,6 +38,41 @@ import {
   initialTimetableSlots,
   initialTeacherProfile,
 } from '../data/initialData';
+
+/**
+ * Normalizes day hours for a school so each day of the week has independent start/end times.
+ * Migrates existing common hours to any unconfigured teaching days.
+ */
+export function normalizeSchoolDayHours(school: School): School {
+  const defaultHours: DayHours = { startTime: '09:00', endTime: '15:30', standardLessonDuration: 30 };
+  const existingValues = Object.values(school.dayHours || {});
+  const fallbackHours = existingValues[0] || defaultHours;
+
+  const normalizedHours: Record<DayOfWeek, DayHours> = {
+    Monday: { ...fallbackHours },
+    Tuesday: { ...fallbackHours },
+    Wednesday: { ...fallbackHours },
+    Thursday: { ...fallbackHours },
+    Friday: { ...fallbackHours },
+  };
+
+  if (school.dayHours) {
+    DAYS_OF_WEEK.forEach((day) => {
+      if (school.dayHours[day]) {
+        normalizedHours[day] = {
+          startTime: school.dayHours[day].startTime || fallbackHours.startTime,
+          endTime: school.dayHours[day].endTime || fallbackHours.endTime,
+          standardLessonDuration: school.dayHours[day].standardLessonDuration || 30,
+        };
+      }
+    });
+  }
+
+  return {
+    ...school,
+    dayHours: normalizedHours,
+  };
+}
 
 /**
  * Strips undefined properties recursively so Firestore does not reject writes.
@@ -128,7 +171,7 @@ export function subscribeToUserTimetableData(
   const unsubSchools = onSnapshot(
     schoolsCol,
     (snap) => {
-      currentSchools = snap.docs.map((d) => d.data() as School);
+      currentSchools = snap.docs.map((d) => normalizeSchoolDayHours(d.data() as School));
       decrementPending();
     },
     onError
@@ -207,17 +250,191 @@ export function subscribeToUserTimetableData(
 }
 
 /**
- * Checks if user has an existing database profile. If not, creates a clean empty account.
+ * Checks if user has an existing database profile. If not, creates a clean empty account
+ * with initial subscription state and role.
  */
-export async function ensureUserInitialized(userId: string, email: string, name?: string): Promise<boolean> {
+export async function ensureUserInitialized(
+  userId: string,
+  email: string,
+  name?: string,
+  mailingListConsent?: boolean
+): Promise<UserAccount> {
   const userRef = doc(db, 'users', userId);
   const snap = await getDoc(userRef);
+  const isAdminEmail = email.trim().toLowerCase() === 'kostispiano@gmail.com';
+  const now = new Date().toISOString();
+
   if (!snap.exists()) {
     const cleanProfile = createCleanTeacherProfile(userId, email, name);
-    await setDoc(userRef, cleanForFirestore(cleanProfile));
-    return true; // was newly created
+    const newAccount: UserAccount = {
+      uid: userId,
+      email: email.trim().toLowerCase(),
+      displayName: name || email.split('@')[0] || 'Music Teacher',
+      role: isAdminEmail ? 'admin' : 'teacher',
+      subscriptionStatus: isAdminEmail ? 'active' : 'inactive',
+      subscriptionPlan: isAdminEmail ? 'annual' : 'none',
+      subscriptionStartDate: now,
+      mailingListConsent: Boolean(mailingListConsent),
+      mailingListConsentDate: mailingListConsent ? now : null,
+      createdAt: now,
+      lastLoginAt: now,
+    };
+
+    // Store combined account and teacher profile
+    await setDoc(userRef, cleanForFirestore({ ...cleanProfile, ...newAccount }));
+    return newAccount;
   }
-  return false;
+
+  const existingData = snap.data();
+  // Ensure admin email always has admin role and active status
+  const role: UserRole = isAdminEmail ? 'admin' : (existingData.role || 'teacher');
+  const subscriptionStatus: SubscriptionStatus = isAdminEmail
+    ? 'active'
+    : (existingData.subscriptionStatus || 'inactive');
+  const subscriptionPlan: SubscriptionPlan = isAdminEmail
+    ? 'annual'
+    : (existingData.subscriptionPlan || 'none');
+
+  const account: UserAccount = {
+    uid: userId,
+    email: existingData.email || email.trim().toLowerCase(),
+    displayName: existingData.displayName || existingData.name || name || email.split('@')[0],
+    role,
+    subscriptionStatus,
+    subscriptionPlan,
+    subscriptionStartDate: existingData.subscriptionStartDate || now,
+    subscriptionEndDate: existingData.subscriptionEndDate,
+    mailingListConsent: Boolean(existingData.mailingListConsent),
+    mailingListConsentDate: existingData.mailingListConsentDate || null,
+    createdAt: existingData.createdAt || now,
+    lastLoginAt: now,
+  };
+
+  // Sync updates (lastLoginAt, plus role/subscription if admin email was newly flagged)
+  try {
+    await updateDoc(userRef, {
+      lastLoginAt: now,
+      ...(isAdminEmail ? { role: 'admin', subscriptionStatus: 'active', subscriptionPlan: 'annual' } : {}),
+      ...(existingData.displayName ? {} : { displayName: account.displayName }),
+    });
+  } catch (e) {
+    // Non-fatal if updateDoc has security limitations on non-modified fields
+  }
+
+  return account;
+}
+
+/**
+ * Retrieves the current UserAccount for a user
+ */
+export async function getUserAccount(userId: string): Promise<UserAccount | null> {
+  const userRef = doc(db, 'users', userId);
+  const snap = await getDoc(userRef);
+  if (!snap.exists()) return null;
+  const data = snap.data();
+  return {
+    uid: userId,
+    email: data.email || '',
+    displayName: data.displayName || data.name || '',
+    role: data.role || 'teacher',
+    subscriptionStatus: data.subscriptionStatus || 'inactive',
+    subscriptionPlan: data.subscriptionPlan || 'none',
+    subscriptionStartDate: data.subscriptionStartDate,
+    subscriptionEndDate: data.subscriptionEndDate,
+    mailingListConsent: Boolean(data.mailingListConsent),
+    mailingListConsentDate: data.mailingListConsentDate,
+    createdAt: data.createdAt || new Date().toISOString(),
+    lastLoginAt: data.lastLoginAt,
+  };
+}
+
+/**
+ * Subscribes to live updates on the current user's UserAccount record
+ */
+export function subscribeToUserAccount(
+  userId: string,
+  callback: (account: UserAccount | null) => void,
+  onError?: (err: Error) => void
+): () => void {
+  const userRef = doc(db, 'users', userId);
+  return onSnapshot(
+    userRef,
+    (snap) => {
+      if (!snap.exists()) {
+        callback(null);
+        return;
+      }
+      const data = snap.data();
+      callback({
+        uid: userId,
+        email: data.email || '',
+        displayName: data.displayName || data.name || '',
+        role: data.role || 'teacher',
+        subscriptionStatus: data.subscriptionStatus || 'inactive',
+        subscriptionPlan: data.subscriptionPlan || 'none',
+        subscriptionStartDate: data.subscriptionStartDate,
+        subscriptionEndDate: data.subscriptionEndDate,
+        mailingListConsent: Boolean(data.mailingListConsent),
+        mailingListConsentDate: data.mailingListConsentDate,
+        createdAt: data.createdAt || new Date().toISOString(),
+        lastLoginAt: data.lastLoginAt,
+      });
+    },
+    onError
+  );
+}
+
+/**
+ * Updates a user's mailing list consent
+ */
+export async function updateMailingListConsent(userId: string, consent: boolean): Promise<void> {
+  const userRef = doc(db, 'users', userId);
+  await updateDoc(userRef, {
+    mailingListConsent: consent,
+    mailingListConsentDate: consent ? new Date().toISOString() : null,
+  });
+}
+
+/**
+ * Admin: Fetch all registered users for subscriber management and metrics
+ */
+export async function adminGetAllUsers(): Promise<UserAccount[]> {
+  const usersCol = collection(db, 'users');
+  const snap = await getDocs(usersCol);
+  return snap.docs.map((d) => {
+    const data = d.data();
+    return {
+      uid: d.id,
+      email: data.email || 'unknown@user.com',
+      displayName: data.displayName || data.name || '',
+      role: (data.role as UserRole) || 'teacher',
+      subscriptionStatus: (data.subscriptionStatus as SubscriptionStatus) || 'inactive',
+      subscriptionPlan: (data.subscriptionPlan as SubscriptionPlan) || 'none',
+      subscriptionStartDate: data.subscriptionStartDate,
+      subscriptionEndDate: data.subscriptionEndDate,
+      mailingListConsent: Boolean(data.mailingListConsent),
+      mailingListConsentDate: data.mailingListConsentDate,
+      createdAt: data.createdAt || new Date().toISOString(),
+      lastLoginAt: data.lastLoginAt,
+    };
+  });
+}
+
+/**
+ * Admin: Update subscription status and plan for a user
+ */
+export async function adminUpdateUserSubscription(
+  userId: string,
+  status: SubscriptionStatus,
+  plan: SubscriptionPlan,
+  endDate?: string
+): Promise<void> {
+  const userRef = doc(db, 'users', userId);
+  await updateDoc(userRef, cleanForFirestore({
+    subscriptionStatus: status,
+    subscriptionPlan: plan,
+    subscriptionEndDate: endDate || undefined,
+  }));
 }
 
 /**

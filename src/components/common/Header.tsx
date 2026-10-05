@@ -1,11 +1,31 @@
 import React from 'react';
-import { Calendar, Wand2, Printer, Sparkles, Cloud, LogOut, LogIn, User as UserIcon } from 'lucide-react';
-import { CycleTerminology, WeekCycle } from '../../types';
+import {
+  Calendar,
+  Wand2,
+  Printer,
+  Sparkles,
+  Cloud,
+  LogOut,
+  LogIn,
+  User as UserIcon,
+  Crown,
+  ShieldCheck,
+} from 'lucide-react';
+import { CycleTerminology, WeekCycle, UserAccount } from '../../types';
 import { User } from 'firebase/auth';
 
+export type AppNavTab =
+  | 'timetable'
+  | 'dashboard'
+  | 'schools'
+  | 'students'
+  | 'settings'
+  | 'account'
+  | 'admin';
+
 interface HeaderProps {
-  activeTab: 'timetable' | 'dashboard' | 'schools' | 'students' | 'settings';
-  setActiveTab: (tab: 'timetable' | 'dashboard' | 'schools' | 'students' | 'settings') => void;
+  activeTab: AppNavTab;
+  setActiveTab: (tab: AppNavTab) => void;
   activeCycle: WeekCycle;
   setActiveCycle: (cycle: WeekCycle) => void;
   cycleTerminology: CycleTerminology;
@@ -14,6 +34,7 @@ interface HeaderProps {
   onOpenWhatIf: () => void;
   onOpenSchoolCycles?: () => void;
   user?: User | null;
+  userAccount?: UserAccount | null;
   onOpenAuth?: () => void;
   onLogOut?: () => void;
   isSyncing?: boolean;
@@ -30,22 +51,24 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenWhatIf,
   onOpenSchoolCycles,
   user,
+  userAccount,
   onOpenAuth,
   onLogOut,
   isSyncing = false,
 }) => {
   const weekLabelA = cycleTerminology === 'week_12' ? 'Week 1' : 'Week A';
   const weekLabelB = cycleTerminology === 'week_12' ? 'Week 2' : 'Week B';
+  const isAdmin = userAccount?.role === 'admin';
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-neutral-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Zone 1: Brand Wordmark (Single text element) */}
+          {/* Zone 1: Brand Wordmark */}
           <div className="flex items-center gap-4 sm:gap-6">
             <button
               onClick={() => setActiveTab('timetable')}
-              className="text-lg font-bold tracking-tight text-neutral-900 hover:text-neutral-700 transition-colors flex items-center gap-2"
+              className="text-lg font-bold tracking-tight text-neutral-900 hover:text-neutral-700 transition-colors flex items-center gap-2 cursor-pointer"
             >
               <span className="w-2.5 h-2.5 rounded-full bg-neutral-900 inline-block" />
               MusiOrg Timetable
@@ -56,7 +79,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 type="button"
                 onClick={onOpenSchoolCycles}
-                className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:text-neutral-950 bg-neutral-100 hover:bg-neutral-200/80 rounded-md border border-neutral-200 transition-colors"
+                className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:text-neutral-950 bg-neutral-100 hover:bg-neutral-200/80 rounded-md border border-neutral-200 transition-colors cursor-pointer"
                 title="Manage independent week cycles for each school"
               >
                 <Calendar className="w-3.5 h-3.5 text-neutral-500" />
@@ -81,7 +104,7 @@ export const Header: React.FC<HeaderProps> = ({
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
             <button
               onClick={() => setActiveTab('timetable')}
-              className={`transition-colors whitespace-nowrap py-1 border-b-2 ${
+              className={`transition-colors whitespace-nowrap py-1 border-b-2 cursor-pointer ${
                 activeTab === 'timetable'
                   ? 'border-neutral-900 text-neutral-950 font-semibold'
                   : 'border-transparent text-neutral-600 hover:text-neutral-900'
@@ -91,7 +114,7 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
             <button
               onClick={() => setActiveTab('dashboard')}
-              className={`transition-colors whitespace-nowrap py-1 border-b-2 ${
+              className={`transition-colors whitespace-nowrap py-1 border-b-2 cursor-pointer ${
                 activeTab === 'dashboard'
                   ? 'border-neutral-900 text-neutral-950 font-semibold'
                   : 'border-transparent text-neutral-600 hover:text-neutral-900'
@@ -101,17 +124,17 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
             <button
               onClick={() => setActiveTab('schools')}
-              className={`transition-colors whitespace-nowrap py-1 border-b-2 ${
+              className={`transition-colors whitespace-nowrap py-1 border-b-2 cursor-pointer ${
                 activeTab === 'schools'
                   ? 'border-neutral-900 text-neutral-950 font-semibold'
                   : 'border-transparent text-neutral-600 hover:text-neutral-900'
               }`}
             >
-              Schools & Restrictions
+              Schools
             </button>
             <button
               onClick={() => setActiveTab('students')}
-              className={`transition-colors whitespace-nowrap py-1 border-b-2 ${
+              className={`transition-colors whitespace-nowrap py-1 border-b-2 cursor-pointer ${
                 activeTab === 'students'
                   ? 'border-neutral-900 text-neutral-950 font-semibold'
                   : 'border-transparent text-neutral-600 hover:text-neutral-900'
@@ -121,64 +144,103 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
             <button
               onClick={() => setActiveTab('settings')}
-              className={`transition-colors whitespace-nowrap py-1 border-b-2 ${
+              className={`transition-colors whitespace-nowrap py-1 border-b-2 cursor-pointer ${
                 activeTab === 'settings'
                   ? 'border-neutral-900 text-neutral-950 font-semibold'
                   : 'border-transparent text-neutral-600 hover:text-neutral-900'
               }`}
             >
-              Settings
+              Teacher Settings
             </button>
+
+            {/* Admin Dashboard Tab (Protected to Admin Role) */}
+            {isAdmin && (
+              <button
+                onClick={() => setActiveTab('admin')}
+                className={`transition-colors whitespace-nowrap py-1 border-b-2 flex items-center gap-1.5 cursor-pointer ${
+                  activeTab === 'admin'
+                    ? 'border-purple-700 text-purple-900 font-bold'
+                    : 'border-transparent text-purple-700 hover:text-purple-900'
+                }`}
+              >
+                <Crown className="w-3.5 h-3.5" />
+                <span>Admin</span>
+              </button>
+            )}
           </nav>
 
-          {/* Zone 3: Primary Actions & User Account */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onOpenWhatIf}
-              title="Test a change and see affected lessons"
-              className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-white border border-neutral-300 rounded-md hover:bg-neutral-50 hover:text-neutral-950 transition-colors whitespace-nowrap cursor-pointer"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-neutral-500" />
-              <span>What If?</span>
-            </button>
+          {/* Zone 3: Actions & Account User Area */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Week A/B or 1/2 Cycle Toggle */}
+            <div className="flex items-center bg-neutral-100 p-0.5 rounded-lg border border-neutral-200">
+              <button
+                onClick={() => setActiveCycle('A')}
+                className={`px-3 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                  activeCycle === 'A'
+                    ? 'bg-white text-neutral-900 shadow-2xs'
+                    : 'text-neutral-500 hover:text-neutral-900'
+                }`}
+              >
+                {weekLabelA}
+              </button>
+              <button
+                onClick={() => setActiveCycle('B')}
+                className={`px-3 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                  activeCycle === 'B'
+                    ? 'bg-white text-neutral-900 shadow-2xs'
+                    : 'text-neutral-500 hover:text-neutral-900'
+                }`}
+              >
+                {weekLabelB}
+              </button>
+            </div>
 
+            {/* Action Buttons */}
             <button
-              onClick={onOpenPrint}
-              title="Print clean timetable for music room door or records"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-white border border-neutral-300 rounded-md hover:bg-neutral-50 hover:text-neutral-950 transition-colors whitespace-nowrap cursor-pointer"
-            >
-              <Printer className="w-3.5 h-3.5 text-neutral-500" />
-              <span className="hidden sm:inline">Print / Export</span>
-            </button>
-
-            <button
+              type="button"
               onClick={onOpenOptimizer}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-neutral-900 rounded-md hover:bg-neutral-800 transition-colors shadow-xs whitespace-nowrap cursor-pointer"
+              className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:text-neutral-950 bg-neutral-100 hover:bg-neutral-200/80 rounded-md transition-colors cursor-pointer"
+              title="Intelligent schedule optimizer"
             >
               <Wand2 className="w-3.5 h-3.5" />
-              <span>Optimise</span>
+              <span>Optimize</span>
             </button>
 
-            {/* User Account Controls */}
+            <button
+              type="button"
+              onClick={onOpenPrint}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:text-neutral-950 bg-neutral-100 hover:bg-neutral-200/80 rounded-md transition-colors cursor-pointer"
+              title="Print timetable view"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Print</span>
+            </button>
+
+            {/* Account & Log Out Area */}
             {user ? (
               <div className="flex items-center gap-1.5 pl-2 ml-1 border-l border-neutral-200">
-                <div
-                  className="hidden md:flex flex-col text-right text-xs max-w-[130px] truncate"
-                  title={user.email || 'Authenticated Teacher'}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('account')}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors cursor-pointer ${
+                    activeTab === 'account'
+                      ? 'bg-neutral-900 text-white border-neutral-900'
+                      : 'bg-neutral-100 text-neutral-800 border-neutral-200 hover:bg-neutral-200/80'
+                  }`}
+                  title="View Account, Subscription & Settings"
                 >
-                  <span className="font-semibold text-neutral-900 truncate">
-                    {user.displayName || user.email?.split('@')[0]}
+                  <UserIcon className="w-3.5 h-3.5 text-neutral-500" />
+                  <span className="hidden xl:inline truncate max-w-[120px]">
+                    {userAccount?.displayName || user.displayName || user.email?.split('@')[0]}
                   </span>
-                  <span className="text-[10px] text-neutral-400 truncate">
-                    {user.email}
-                  </span>
-                </div>
+                  <span className="xl:hidden">Account</span>
+                </button>
 
                 <button
                   type="button"
                   onClick={onLogOut}
                   className="p-1.5 text-neutral-500 hover:text-rose-600 rounded-md hover:bg-rose-50 transition-colors cursor-pointer"
-                  title="Sign out of MusiOrg"
+                  title="Log out of MusiOrg Timetable"
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
@@ -189,10 +251,10 @@ export const Header: React.FC<HeaderProps> = ({
                   type="button"
                   onClick={onOpenAuth}
                   className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-neutral-800 bg-neutral-100 hover:bg-neutral-200 rounded-md transition-colors cursor-pointer"
-                  title="Sign in or create account for multi-device sync"
+                  title="Sign in or create account"
                 >
                   <LogIn className="w-3.5 h-3.5 text-neutral-600" />
-                  <span>Log In / Sign Up</span>
+                  <span>Log In</span>
                 </button>
               </div>
             )}
@@ -200,53 +262,52 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Mobile Navigation bar */}
-        <div className="flex md:hidden items-center justify-between py-2 border-t border-neutral-100 overflow-x-auto text-xs">
+        <div className="flex md:hidden items-center justify-between py-2 border-t border-neutral-100 overflow-x-auto text-xs gap-3">
           <div className="flex gap-4">
             <button
               onClick={() => setActiveTab('timetable')}
-              className={`py-1 ${activeTab === 'timetable' ? 'font-bold text-neutral-950' : 'text-neutral-500'}`}
+              className={`py-1 cursor-pointer ${activeTab === 'timetable' ? 'font-bold text-neutral-950' : 'text-neutral-500'}`}
             >
               Timetable
             </button>
             <button
               onClick={() => setActiveTab('dashboard')}
-              className={`py-1 ${activeTab === 'dashboard' ? 'font-bold text-neutral-950' : 'text-neutral-500'}`}
+              className={`py-1 cursor-pointer ${activeTab === 'dashboard' ? 'font-bold text-neutral-950' : 'text-neutral-500'}`}
             >
               Dashboard
             </button>
             <button
               onClick={() => setActiveTab('schools')}
-              className={`py-1 ${activeTab === 'schools' ? 'font-bold text-neutral-950' : 'text-neutral-500'}`}
+              className={`py-1 cursor-pointer ${activeTab === 'schools' ? 'font-bold text-neutral-950' : 'text-neutral-500'}`}
             >
               Schools
             </button>
             <button
               onClick={() => setActiveTab('students')}
-              className={`py-1 ${activeTab === 'students' ? 'font-bold text-neutral-950' : 'text-neutral-500'}`}
+              className={`py-1 cursor-pointer ${activeTab === 'students' ? 'font-bold text-neutral-950' : 'text-neutral-500'}`}
             >
               Students
             </button>
             <button
               onClick={() => setActiveTab('settings')}
-              className={`py-1 ${activeTab === 'settings' ? 'font-bold text-neutral-950' : 'text-neutral-500'}`}
+              className={`py-1 cursor-pointer ${activeTab === 'settings' ? 'font-bold text-neutral-950' : 'text-neutral-500'}`}
             >
               Settings
             </button>
-          </div>
-
-          <div className="inline-flex sm:hidden items-center bg-neutral-100 p-0.5 rounded text-[11px]">
             <button
-              onClick={() => setActiveCycle('A')}
-              className={`px-2 py-0.5 font-medium rounded ${activeCycle === 'A' ? 'bg-white text-neutral-900' : 'text-neutral-500'}`}
+              onClick={() => setActiveTab('account')}
+              className={`py-1 cursor-pointer ${activeTab === 'account' ? 'font-bold text-neutral-950' : 'text-neutral-500'}`}
             >
-              {weekLabelA}
+              Account
             </button>
-            <button
-              onClick={() => setActiveCycle('B')}
-              className={`px-2 py-0.5 font-medium rounded ${activeCycle === 'B' ? 'bg-white text-neutral-900' : 'text-neutral-500'}`}
-            >
-              {weekLabelB}
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => setActiveTab('admin')}
+                className={`py-1 font-bold text-purple-700 cursor-pointer ${activeTab === 'admin' ? 'underline' : ''}`}
+              >
+                Admin
+              </button>
+            )}
           </div>
         </div>
       </div>

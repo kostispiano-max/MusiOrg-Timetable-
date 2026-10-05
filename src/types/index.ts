@@ -2,6 +2,29 @@ export type DayOfWeek = 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Frida
 
 export const DAYS_OF_WEEK: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
+// Standard lesson duration options (strictly 20, 30, 40 minutes)
+export const STANDARD_LESSON_DURATIONS = [20, 30, 40] as const;
+export type StandardLessonDuration = typeof STANDARD_LESSON_DURATIONS[number];
+
+export type UserRole = 'admin' | 'teacher';
+export type SubscriptionStatus = 'active' | 'inactive' | 'trial' | 'cancelled';
+export type SubscriptionPlan = 'monthly' | 'annual' | 'trial' | 'comp' | 'none';
+
+export interface UserAccount {
+  uid: string;
+  email: string;
+  displayName?: string;
+  role: UserRole;
+  subscriptionStatus: SubscriptionStatus;
+  subscriptionPlan: SubscriptionPlan;
+  subscriptionStartDate?: string;
+  subscriptionEndDate?: string;
+  mailingListConsent: boolean;
+  mailingListConsentDate?: string | null;
+  createdAt: string;
+  lastLoginAt?: string;
+}
+
 export type WeekCycle = 'A' | 'B';
 
 export type CycleTerminology = 'week_ab' | 'week_12';

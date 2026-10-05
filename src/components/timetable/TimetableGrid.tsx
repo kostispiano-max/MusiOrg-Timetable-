@@ -102,9 +102,23 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
     return school?.currentWeekCycle || 'A';
   };
 
-  // Find school open/close range for the time scale
-  const globalStartMin = 8 * 60 + 30; // 08:30
-  const globalEndMin = 15 * 60 + 30; // 15:30
+  // Find school open/close range for the time scale dynamically
+  let earliestMin = 8 * 60 + 30; // 08:30 default
+  let latestMin = 16 * 60; // 16:00 default
+
+  context.schools.forEach((sc) => {
+    DAYS_OF_WEEK.forEach((d) => {
+      if (sc.teachingDays.includes(d) && sc.dayHours?.[d]) {
+        const sM = timeToMinutes(sc.dayHours[d].startTime);
+        const eM = timeToMinutes(sc.dayHours[d].endTime);
+        if (sM < earliestMin) earliestMin = Math.floor(sM / 30) * 30;
+        if (eM > latestMin) latestMin = Math.ceil(eM / 30) * 30;
+      }
+    });
+  });
+
+  const globalStartMin = Math.min(8 * 60 + 30, earliestMin);
+  const globalEndMin = Math.max(16 * 60, latestMin);
   const stepMin = 30; // 30-min grid intervals
 
   const timeRows: string[] = [];
@@ -168,6 +182,11 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
                       ? schoolsOnDay.map((s) => s.name).join(', ')
                       : 'No teaching scheduled'}
                   </div>
+                  {activeSchool?.dayHours?.[day] && schoolsOnDay.length > 0 && (
+                    <div className="text-[10px] text-neutral-500 font-mono mt-0.5">
+                      {activeSchool.dayHours[day].startTime}–{activeSchool.dayHours[day].endTime}
+                    </div>
+                  )}
                 </div>
 
                 {activeSchool && (
